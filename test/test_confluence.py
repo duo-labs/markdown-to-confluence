@@ -133,5 +133,38 @@ class TestConfluence(unittest.TestCase):
         self.assertEqual(got['userKey'], userKey)
 
 
+class TestConfluenceHeaders(unittest.TestCase):
+    def assert_headers(self, got, want):
+        for name, value in want.items():
+            self.assertEqual(got[name], value)
+
+    def testHeaders(self):
+        headers = ['Cookie: NAME=VALUE', 'X-CUSTOM-HEADER: VALUE']
+        want = {'Cookie': ' NAME=VALUE', 'X-CUSTOM-HEADER': ' VALUE'}
+
+        api = Confluence(api_url='https://wiki.example.com/rest/api',
+                         headers=headers)
+        self.assert_headers(api._session.headers, want)
+
+    def testHeadersDuplicates(self):
+        # HTTP headers are case insensitive. If multiple headers with the same
+        # name are passed, the last one should win.
+        headers = ['X-CUSTOM-HEADER: foo', 'X-Custom-Header: bar', 'x-custom-header: baz']
+        want = {'x-custom-header': ' baz'}
+
+        api = Confluence(api_url='https://wiki.example.com/rest/api',
+                         headers=headers)
+        self.assert_headers(api._session.headers, want)
+
+    def testHeadersNoValue(self):
+        # If no value is set, an empty string should be used.
+        headers = ['X-CUSTOM-HEADER-1:', 'X-CUSTOM-HEADER-2']
+        want = {'X-CUSTOM-HEADER-1': '', 'X-CUSTOM-HEADER-2': ''}
+
+        api = Confluence(api_url='https://wiki.example.com/rest/api',
+                         headers=headers)
+        self.assert_headers(api._session.headers, want)
+
+
 if __name__ == '__main__':
     unittest.main()
