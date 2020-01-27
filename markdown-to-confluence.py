@@ -19,6 +19,25 @@ log = logging.getLogger(__name__)
 SUPPORTED_FORMATS = ['.md']
 
 
+def get_environ_headers(prefix):
+    """Returns a list of headers read from environment variables whose key
+    starts with prefix.
+
+    The header names are derived from the environment variable keys by
+    stripping the prefix. The header values are set to the environment
+    variable values.
+
+    Arguments:
+        prefix {str} -- The prefix of the environment variable keys which specify headers.
+    """
+    headers = []
+    for key, value in os.environ.items():
+        if key.startswith(prefix):
+            header_name = key[len(prefix):]
+            headers.append("{}:{}".format(header_name, value))
+    return headers
+
+
 def get_last_modified(repo):
     """Returns the paths to the last modified files in the provided Git repo
     
@@ -98,6 +117,15 @@ def parse_args():
         default=os.getenv('CONFLUENCE_GLOBAL_LABEL'),
         help=
         'The label to apply to every post for easier discovery in Confluence (default: env(\'CONFLUENCE_GLOBAL_LABEL\'))'
+    )
+    parser.add_argument(
+        '--header',
+        metavar='HEADER',
+        dest='headers',
+        action='append',
+        default=get_environ_headers('CONFLUENCE_HEADER_'),
+        help=
+        'Extra header to include in the request when sending HTTP to a server. May be specified multiple times. (default: env(\'CONFLUENCE_HEADER_<NAME>\'))'
     )
     parser.add_argument(
         '--dry-run',
@@ -205,6 +233,7 @@ def main():
     confluence = Confluence(api_url=args.api_url,
                             username=args.username,
                             password=args.password,
+                            headers=args.headers,
                             dry_run=args.dry_run)
 
     if args.posts:

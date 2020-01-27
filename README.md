@@ -24,7 +24,7 @@ docker build -t markdown-to-confluence .
 usage: markdown-to-confluence.py [-h] [--git GIT] [--api_url API_URL]
                                  [--username USERNAME] [--password PASSWORD]
                                  [--space SPACE] [--ancestor_id ANCESTOR_ID]
-                                 [--dry-run]
+                                 [--header HEADER] [--dry-run]
                                  [posts [posts ...]]
 
 Converts and deploys a markdown post to Confluence
@@ -48,6 +48,9 @@ optional arguments:
   --ancestor_id ANCESTOR_ID
                         The Confluence ID of the parent page to place posts
                         under (default: env('CONFLUENCE_ANCESTOR_ID'))
+  --header HEADER       Extra header to include in the request when sending
+                        HTTP to a server. May be specified multiple times.
+                        (default: env('CONFLUENCE_HEADER_<NAME>'))
   --dry-run             Print requests that would be sent- don't actually make
                         requests against Confluence (note: we return empty
                         responses, so this might impact accuracy)

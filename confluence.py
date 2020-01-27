@@ -28,6 +28,7 @@ class Confluence():
                  api_url=None,
                  username=None,
                  password=None,
+                 headers=None,
                  dry_run=False,
                  _client=None):
         """Creates a new Confluence API client.
@@ -36,7 +37,8 @@ class Confluence():
             api_url {str} -- The URL to the Confluence API root (e.g. https://wiki.example.com/api/rest/)
             username {str} -- The Confluence service account username
             password {str} -- The Confluence service account password
-            _dry_run {str} -- The Confluence service account password
+            headers {list(str)} -- The HTTP headers which will be set for all requests
+            dry_run {str} -- The Confluence service account password
         """
         # A common gotcha will be given a URL that doesn't end with a /, so we
         # can account for this
@@ -53,6 +55,12 @@ class Confluence():
 
         self._session = _client
         self._session.auth = (self.username, self.password)
+        for header in headers or []:
+            try:
+                name, value = header.split(':', 1)
+            except ValueError:
+                name, value = header, ''
+            self._session.headers[name] = value.lstrip()
 
     def _require_kwargs(self, kwargs):
         """Ensures that certain kwargs have been provided
