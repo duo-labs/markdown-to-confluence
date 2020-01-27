@@ -155,7 +155,7 @@ class Confluence():
         if ancestor_id:
             cql_args.append('ancestor={}'.format(ancestor_id))
         if space:
-            cql_args.append('space={}'.format(space))
+            cql_args.append('space={!r}'.format(space))
 
         cql = ' and '.join(cql_args)
 
