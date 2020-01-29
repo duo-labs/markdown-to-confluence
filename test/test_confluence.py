@@ -140,7 +140,7 @@ class TestConfluenceHeaders(unittest.TestCase):
 
     def testHeaders(self):
         headers = ['Cookie: NAME=VALUE', 'X-CUSTOM-HEADER: VALUE']
-        want = {'Cookie': ' NAME=VALUE', 'X-CUSTOM-HEADER': ' VALUE'}
+        want = {'Cookie': 'NAME=VALUE', 'X-CUSTOM-HEADER': 'VALUE'}
 
         api = Confluence(api_url='https://wiki.example.com/rest/api',
                          headers=headers)
@@ -150,7 +150,7 @@ class TestConfluenceHeaders(unittest.TestCase):
         # HTTP headers are case insensitive. If multiple headers with the same
         # name are passed, the last one should win.
         headers = ['X-CUSTOM-HEADER: foo', 'X-Custom-Header: bar', 'x-custom-header: baz']
-        want = {'x-custom-header': ' baz'}
+        want = {'x-custom-header': 'baz'}
 
         api = Confluence(api_url='https://wiki.example.com/rest/api',
                          headers=headers)
