@@ -21,7 +21,7 @@ def parse(post_path):
         for line in post.readlines():
             # Check if this is the ending tag
             if line.strip() == YAML_BOUNDARY:
-                if raw_yaml:
+                if in_yaml and raw_yaml:
                     in_yaml = False
                     continue
             if in_yaml:
