@@ -92,14 +92,14 @@ class ConfluenceRenderer(mistune.HTMLRenderer):
         main_content = column.format(width='800px', content=content)
         return sidebar + main_content
 
-    def header(self, text, level, raw=None):
+    def heading(self, text, level):
         """Processes a Markdown header.
 
         In our case, this just tells us that we need to render a TOC. We don't
         actually do any special rendering for headers.
         """
         self.has_toc = True
-        return super().header(text, level, raw)
+        return super().heading(text, level)
 
     def render_authors(self):
         """Renders a header that details which author(s) published the post.

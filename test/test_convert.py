@@ -47,7 +47,7 @@ class TestConvert(unittest.TestCase):
         have = 'test'
         want = '<h1>{}</h1>'.format(have)
         renderer = ConfluenceRenderer()
-        got = renderer.header(have, 1)
+        got = renderer.heading(have, 1)
         got = got.strip()
         self.assertEqual(got, want)
         self.assertEqual(renderer.has_toc, True)
