@@ -40,7 +40,7 @@ def get_environ_headers(prefix):
 
 def get_last_modified(repo):
     """Returns the paths to the last modified files in the provided Git repo
-    
+
     Arguments:
         repo {git.Repo} -- The repository object
     """
@@ -53,7 +53,7 @@ def get_last_modified(repo):
 
 def get_slug(filepath, prefix=''):
     """Returns the slug for a given filepath
-    
+
     Arguments:
         filepath {str} -- The filepath for the post
         prefix {str} -- Any prefixes to the slug
@@ -135,6 +135,12 @@ def parse_args():
         'Print requests that would be sent- don\'t actually make requests against Confluence (note: we return empty responses, so this might impact accuracy)'
     )
     parser.add_argument(
+        '--static-path',
+        dest='static_path',
+        default='static',
+        help='The prefix of your static files (default: {}))'.format(
+            'static'))
+    parser.add_argument(
         'posts',
         type=str,
         nargs='*',
@@ -153,7 +159,7 @@ def parse_args():
 
 def deploy_file(post_path, args, confluence):
     """Creates or updates a file in Confluence
-    
+
     Arguments:
         post_path {str} -- The absolute path of the post to deploy to Confluence
         args {argparse.Arguments} -- The parsed command-line arguments
@@ -185,16 +191,20 @@ def deploy_file(post_path, args, confluence):
         confluence_author = confluence.get_author(author)
         if not confluence_author:
             continue
-        front_matter['author_keys'].append(confluence_author['userKey'])
+        front_matter['author_keys'].append(confluence_author['accountId'])
+
+    if len(front_matter['author_keys']) == 0:
+        front_matter['author_keys'].append(confluence.get_current_user())
 
     # Normalize the content into whatever format Confluence expects
     html, attachments = convtoconf(markdown, front_matter=front_matter)
 
-    static_path = os.path.join(args.git, 'static')
+
+    static_path = os.path.join(args.git, args.static_path)
     for i, attachment in enumerate(attachments):
         attachments[i] = os.path.join(static_path, attachment.lstrip('/'))
 
-    slug_prefix = '_'.join(author.lower() for author in authors)
+    slug_prefix = '{}{}'.format('s','_'.join(author.lower() for author in authors))
     post_slug = get_slug(post_path, prefix=slug_prefix)
 
     ancestor_id = front_matter['wiki'].get('ancestor_id', args.ancestor_id)
@@ -207,6 +217,7 @@ def deploy_file(post_path, args, confluence):
     page = confluence.exists(slug=post_slug,
                              ancestor_id=ancestor_id,
                              space=space)
+
     if page:
         confluence.update(page['id'],
                           content=html,
@@ -219,12 +230,12 @@ def deploy_file(post_path, args, confluence):
                           attachments=attachments)
     else:
         confluence.create(content=html,
-                          title=front_matter['title'],
-                          tags=tags,
-                          slug=post_slug,
-                          space=space,
-                          ancestor_id=ancestor_id,
-                          attachments=attachments)
+                            title=front_matter['title'],
+                            tags=tags,
+                            slug=post_slug,
+                            space=space,
+                            ancestor_id=ancestor_id,
+                            attachments=attachments)
 
 
 def main():

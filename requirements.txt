@@ -3,7 +3,7 @@ chardet==3.0.4
 gitdb2==2.0.6
 GitPython==3.0.4
 idna==2.8
-mistune==0.8.4
+mistune==2.0.0a4
 PyYAML==5.1.2
 requests==2.22.0
 smmap2==2.0.5
