@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 
 API_HEADERS = {
     'User-Agent': 'markdown-to-confluence',
+    'X-Atlassian-Token': 'no-check'
 }
 
 MULTIPART_HEADERS = {
@@ -32,7 +33,7 @@ class Confluence():
                  dry_run=False,
                  _client=None):
         """Creates a new Confluence API client.
-        
+
         Arguments:
             api_url {str} -- The URL to the Confluence API root (e.g. https://wiki.example.com/api/rest/)
             username {str} -- The Confluence service account username
@@ -64,7 +65,7 @@ class Confluence():
 
     def _require_kwargs(self, kwargs):
         """Ensures that certain kwargs have been provided
-        
+
         Arguments:
             kwargs {dict} -- The dict of required kwargs
         """
@@ -115,16 +116,16 @@ class Confluence():
 
         if not response.ok:
             log.info('''{method} {url}: {status_code} {reason}
-            Params: {params}
-            Data: {data}
-            Files: {files}'''.format(method=method,
-                                     url=url,
-                                     status_code=response.status_code,
-                                     reason=response.reason,
-                                     params=params,
-                                     data=data,
-                                     files=files))
-            print(response.content)
+                Params: {params}
+                Data: {data}
+                Files: {files}'''.format(method=method,
+                                            url=url,
+                                            status_code=response.status_code,
+                                            reason=response.reason,
+                                            params=params,
+                                            data=data,
+                                            files=files))
+
             return response.content
 
         # Will probably want to be more robust here, but this should work for now
@@ -149,7 +150,7 @@ class Confluence():
         Specifically, this leverages a Confluence Query Language (CQL) query
         against the Confluence API. We assume that each slug is unique, at
         least to the provided space/ancestor_id.
-        
+
         Arguments:
             space {str} -- The Confluence space to use for filtering posts
             slug {str} -- The page slug
@@ -179,7 +180,7 @@ class Confluence():
 
         We specifically require a slug to be provided, since this is how we
         determine if a page exists. Any other tags are optional.
-        
+
         Keyword Arguments:
             page_id {str} -- The ID of the existing page to which the label should apply
             slug {str} -- The page slug to use as the label value
@@ -242,7 +243,7 @@ class Confluence():
 
     def get_attachments(self, post_id):
         """Gets the attachments for a particular Confluence post
-        
+
         Arguments:
             post_id {str} -- The Confluence post ID
         """
@@ -251,7 +252,7 @@ class Confluence():
 
     def upload_attachment(self, post_id=None, attachment_path=None):
         """Uploads an attachment to a Confluence post
-        
+
         Keyword Arguments:
             post_id {str} -- The Confluence post ID
             attachment_path {str} -- The absolute path to the attachment
@@ -276,9 +277,18 @@ class Confluence():
             username {str} -- The Confluence username
         """
         log.info('Looking up Confluence user key for {}'.format(username))
-        response = self.get(path='user', params={'username': username})
-        if not isinstance(response, dict) or not response.get('userKey'):
+        response = self.get(path='user', params={'accountId': username})
+        if not isinstance(response, dict) or not response.get('accountId'):
             log.error('No Confluence user key for {}'.format(username))
+            return {}
+        return response
+
+    def get_current_user(self):
+        """Returns the Confluence author profile for the connected username
+        """
+        log.info('Looking up current Confluence user key')
+        response = self.get(path='user/current')
+        if not isinstance(response, dict) or not response.get('accountId'):
             return {}
         return response
 
@@ -295,7 +305,7 @@ class Confluence():
 
         If an ancestor_id is specified, then the page will be created as a
         child of that ancestor page.
-        
+
         Keyword Arguments:
             content {str} -- The HTML content to upload (required)
             space {str} -- The Confluence space where the page should reside
@@ -318,9 +328,13 @@ class Confluence():
                                          ancestor_id=ancestor_id,
                                          space=space,
                                          type=type)
-        response = self.post(path='content/', data=page)
 
+        response = self.post(path='content/', data=page)
+        # print(response)
         page_id = response['id']
+        # to resuem, we can update the labels on the page
+        self.create_labels(page_id=page_id, slug=slug, tags=tags)
+
         page_url = urljoin(self.api_url, response['_links']['webui'])
 
         log.info('Page "{title}" (id {page_id}) created successfully at {url}'.
@@ -353,7 +367,7 @@ class Confluence():
 
         This involves updating the attachments stored on Confluence, uploading
         the page content, and finally updating the labels.
-        
+
         Keyword Arguments:
             post_id {str} -- The ID of the Confluence post
             content {str} -- The page represented in Confluence storage format

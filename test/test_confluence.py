@@ -116,7 +116,7 @@ class TestConfluence(unittest.TestCase):
         expected = {
             "type": "known",
             "username": "foo",
-            "userKey": userKey,
+            "accountId": userKey,
             "profilePicture": {
                 "path": "/download/attachments/123456/user-avatar",
                 "width": 48,
@@ -130,7 +130,7 @@ class TestConfluence(unittest.TestCase):
                                       is_json=True)
         self.api._session = client
         got = self.api.get_author('foo')
-        self.assertEqual(got['userKey'], userKey)
+        self.assertEqual(got['accountId'], userKey)
 
 
 class TestConfluenceHeaders(unittest.TestCase):
