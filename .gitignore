@@ -19,6 +19,7 @@ lib64/
 parts/
 sdist/
 var/
+bin/
 wheels/
 pip-wheel-metadata/
 share/python-wheels/
@@ -129,3 +130,4 @@ dmypy.json
 .pyre/
 
 .vscode/
+pyvenv.cfg

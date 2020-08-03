@@ -1,0 +1,6 @@
+bin/
+lib/
+test/
+__pycache__/
+Dockerfile
+pyvenv.cfg
