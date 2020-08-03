@@ -10,7 +10,7 @@ WORKDIR /usr/src/app
 
 COPY . .
 
-RUN apk add --no-cache git \
+RUN apk add --no-cache git bash \
     && pip install --no-cache-dir -r requirements.txt
 
 CMD [ "python", "./markdown-to-confluence.py" ]
