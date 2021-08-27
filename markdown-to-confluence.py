@@ -210,6 +210,7 @@ def deploy_file(post_path, args, confluence):
                              ancestor_id=ancestor_id,
                              space=space)
     if page:
+        log.info('Page exists, updating...')
         confluence.update(page['id'],
                           content=html,
                           title=front_matter['title'],
@@ -220,6 +221,7 @@ def deploy_file(post_path, args, confluence):
                           page=page,
                           attachments=attachments)
     else:
+        log.info('Page does not exist, creating...')
         confluence.create(content=html,
                           title=front_matter['title'],
                           tags=tags,
