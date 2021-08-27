@@ -43,12 +43,12 @@ def parse(post_path):
     return front_matter, markdown
 
 
-def convtoconf(markdown, front_matter={}):
+def convtoconf(markdown, front_matter={}, post_path='.'):
     if front_matter is None:
         front_matter = {}
 
     author_keys = front_matter.get('author_keys', [])
-    renderer = ConfluenceRenderer(authors=author_keys)
+    renderer = ConfluenceRenderer(authors=author_keys, post_path=post_path)
     content_html = mistune.markdown(markdown, renderer=renderer)
     page_html = renderer.layout(content_html)
 
@@ -56,12 +56,13 @@ def convtoconf(markdown, front_matter={}):
 
 
 class ConfluenceRenderer(mistune.Renderer):
-    def __init__(self, authors=[]):
+    def __init__(self, authors=[], post_path='.'):
         self.attachments = []
         if authors is None:
             authors = []
         self.authors = authors
         self.has_toc = False
+        self.post_path = post_path
         super().__init__()
 
     def layout(self, content):
@@ -156,7 +157,9 @@ class ConfluenceRenderer(mistune.Renderer):
         tag_template = '<ac:image>{image_tag}</ac:image>'
         image_tag = '<ri:url ri:value="{}" />'.format(src)
         if not is_external:
+            image_path = os.path.normpath(os.path.join(os.path.dirname(self.post_path), src))
             image_tag = '<ri:attachment ri:filename="{}" />'.format(
-                os.path.basename(src))
-            self.attachments.append(src)
+                os.path.basename(image_path))
+            log.debug('Found attachment: {}'.format(image_path))
+            self.attachments.append(image_path)
         return tag_template.format(image_tag=image_tag)

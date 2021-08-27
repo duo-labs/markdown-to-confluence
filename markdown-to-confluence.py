@@ -191,11 +191,7 @@ def deploy_file(post_path, args, confluence):
         front_matter['author_keys'].append(confluence_author['userKey'])
 
     # Normalize the content into whatever format Confluence expects
-    html, attachments = convtoconf(markdown, front_matter=front_matter)
-
-    static_path = os.path.join(args.git, 'static')
-    for i, attachment in enumerate(attachments):
-        attachments[i] = os.path.join(static_path, attachment.lstrip('/'))
+    html, attachments = convtoconf(markdown, front_matter=front_matter, post_path=post_path)
 
     slug_prefix = '_'.join(author.lower() for author in authors)
     post_slug = get_slug(post_path, prefix=slug_prefix)
