@@ -5,6 +5,7 @@ import os
 import requests
 import git
 import sys
+import stat
 
 from confluence import Confluence
 from convert import convtoconf, parse
@@ -229,7 +230,16 @@ def deploy_file(post_path, args, confluence):
                           space=space,
                           ancestor_id=ancestor_id,
                           attachments=attachments)
+def is_hidden(filepath):
+    name = os.path.basename(os.path.abspath(filepath))
+    return name.startswith('.') or has_hidden_attribute(filepath)
 
+def has_hidden_attribute(filepath):
+    return bool(os.stat(filepath).st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
+
+def is_markdown(filepath):
+    name = os.path.basename(os.path.abspath(filepath))
+    return name.endswith('.md')
 
 def main():
     args = parse_args()
@@ -241,11 +251,25 @@ def main():
                             dry_run=args.dry_run)
 
     if args.posts:
-        changed_posts = [os.path.abspath(post) for post in args.posts]
-        for post_path in changed_posts:
-            if not os.path.exists(post_path) or not os.path.isfile(post_path):
-                log.error('File doesn\'t exist: {}'.format(post_path))
-                sys.exit(1)
+        a = [os.path.abspath(post) for post in args.posts]
+        changed_posts = []
+        for post_path in a:
+            if os.path.exists(post_path):
+                if os.path.isdir(post_path):
+                    for root, dirs, files in os.walk(post_path):
+                        files = [f for f in files if not f[0] == '.']
+                        dirs[:] = [d for d in dirs if not d[0] == '.']
+                        for f in files:
+                            changed_posts.append(os.path.join(root,f))
+                elif os.path.isfile(post_path):
+                    changed_posts.append(post_path)
+                else:
+                    log.info('Skipped: {}'.format(post_path))
+            else:
+                log.info('File doesn\'t exist: {}'.format(post_path))
+
+        changed_posts = [ post for post in changed_posts if is_markdown(post) ]
+        log.debug('Files to sync: {}'.format(changed_posts))
     else:
         repo = git.Repo(args.git)
         changed_posts = [
