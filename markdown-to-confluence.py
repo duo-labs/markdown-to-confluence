@@ -138,7 +138,7 @@ def parse_args():
         'Print requests that would be sent- don\'t actually make requests against Confluence (note: we return empty responses, so this might impact accuracy)'
     )
     parser.add_argument(
-        'files|directories',
+        'files',
         type=str,
         nargs='*',
         help=
@@ -246,36 +246,36 @@ def main():
                             headers=args.headers,
                             dry_run=args.dry_run)
 
-    if args.posts:
-        a = [os.path.abspath(post) for post in args.posts]
-        changed_posts = []
-        for post_path in a:
-            if os.path.exists(post_path):
-                if os.path.isdir(post_path):
-                    for root, dirs, files in os.walk(post_path):
+    if args.files:
+        files = [os.path.abspath(post) for post in args.files]
+        files_to_upload = []
+        for file_path in files:
+            if os.path.exists(file_path):
+                if os.path.isdir(file_path):
+                    for root, dirs, files in os.walk(file_path):
                         files = [f for f in files if not f[0] == '.']
                         dirs[:] = [d for d in dirs if not d[0] == '.']
                         for f in files:
-                            changed_posts.append(os.path.join(root,f))
-                elif os.path.isfile(post_path):
-                    changed_posts.append(post_path)
+                            files_to_upload.append(os.path.join(root,f))
+                elif os.path.isfile(file_path):
+                    files_to_upload.append(file_path)
                 else:
-                    log.info('Skipped: {}'.format(post_path))
+                    log.info('Skipped: {}'.format(file_path))
             else:
-                log.info('File doesn\'t exist: {}'.format(post_path))
+                log.info('File doesn\'t exist: {}'.format(file_path))
 
-        changed_posts = [ post for post in changed_posts if is_markdown(post) ]
-        log.debug('Files to sync: {}'.format(changed_posts))
+        files_to_upload = [ file_to_upload for file_to_upload in files_to_upload if is_markdown(file_to_upload) ]
+        log.debug('Files to sync: {}'.format(files_to_upload))
     else:
         repo = git.Repo(args.git)
-        changed_posts = [
-            os.path.join(args.git, post) for post in get_last_modified(repo)
+        files_to_upload = [
+            os.path.join(args.git, file_to_upload) for file_to_upload in get_last_modified(repo)
         ]
-    if not changed_posts:
-        log.info('No post created/modified in the latest commit')
+    if not files_to_upload:
+        log.info('No files created/modified in the latest commit')
         return
 
-    for post in changed_posts:
+    for post in files_to_upload:
         log.info('Attempting to deploy {}'.format(post))
         deploy_file(post, args, confluence)
 
