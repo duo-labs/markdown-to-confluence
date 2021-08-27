@@ -2,7 +2,7 @@
 
 Converts and deploys a Markdown file to Confluence.
 
-This project was created to sync [Journal](https://duo-labs.github.io/journal/) posts to Confluence as part of the CI process. However, it's able to more generally handle Markdown files that have front-matter at the top, such as those used in Hugo, Jeykll, etc.
+This repository is a fork of [duo-labs/markdown-to-confluence](https://github.com/duo-labs/markdown-to-confluence). It was created to sync [Journal](https://duo-labs.github.io/journal/) posts to Confluence as part of the CI process. However, it's able to more generally handle Markdown files that have front-matter at the top, such as those used in Hugo, Jeykll, etc.
 
 # Installation
 
@@ -24,19 +24,22 @@ docker build -t markdown-to-confluence .
 usage: markdown-to-confluence.py [-h] [--git GIT] [--api_url API_URL]
                                  [--username USERNAME] [--password PASSWORD]
                                  [--space SPACE] [--ancestor_id ANCESTOR_ID]
+                                 [--global_label GLOBAL_LABEL]
                                  [--header HEADER] [--dry-run]
-                                 [posts [posts ...]]
+                                 [files|directories ...]
 
 Converts and deploys a markdown post to Confluence
 
 positional arguments:
-  posts                 Individual files to deploy to Confluence (takes
-                        precendence over --git)
+  files|directories     List of directories and files to deploy to Confluence.
+                        The whole subtree of the listed directories are
+                        scanned for markdown (.md) files. (takes precendence
+                        over --git)
 
 optional arguments:
   -h, --help            show this help message and exit
   --git GIT             The path to your Git repository (default:
-                        /Users/jwright/src/journal-to-confluence))
+                        /home/barnabas/Repositories/markdown-to-confluence))
   --api_url API_URL     The URL to the Confluence API (e.g.
                         https://wiki.example.com/rest/api/)
   --username USERNAME   The username for authentication to Confluence
@@ -48,6 +51,10 @@ optional arguments:
   --ancestor_id ANCESTOR_ID
                         The Confluence ID of the parent page to place posts
                         under (default: env('CONFLUENCE_ANCESTOR_ID'))
+  --global_label GLOBAL_LABEL
+                        The label to apply to every post for easier discovery
+                        in Confluence (default:
+                        env('CONFLUENCE_GLOBAL_LABEL'))
   --header HEADER       Extra header to include in the request when sending
                         HTTP to a server. May be specified multiple times.
                         (default: env('CONFLUENCE_HEADER_<NAME>'))

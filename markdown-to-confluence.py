@@ -138,11 +138,11 @@ def parse_args():
         'Print requests that would be sent- don\'t actually make requests against Confluence (note: we return empty responses, so this might impact accuracy)'
     )
     parser.add_argument(
-        'posts',
+        'files|directories',
         type=str,
         nargs='*',
         help=
-        'Individual files to deploy to Confluence (takes precendence over --git)'
+        'List of directories and files to deploy to Confluence. The whole subtree of the listed directories are scanned for markdown (.md) files. (takes precendence over --git)'
     )
 
     args = parser.parse_args()
