@@ -63,6 +63,7 @@ def get_slug(filepath, prefix=''):
     # Confluence doesn't support searching for labels with a "-",
     # so we need to adjust it.
     slug = slug.replace('-', '_')
+    slug = slug.replace(" ", "_")
     if prefix:
         slug = '{}_{}'.format(prefix, slug)
     return slug
@@ -175,7 +176,7 @@ def deploy_file(post_path, args, confluence):
             .format(post_path, e))
         return
 
-    if 'wiki' not in front_matter or not front_matter['wiki'].get('share'):
+    if not front_matter or not front_matter.get('wiki', {}).get('share'):
         log.info(
             'Post {} not set to be uploaded to Confluence'.format(post_path))
         return

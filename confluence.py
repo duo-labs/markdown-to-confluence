@@ -159,7 +159,7 @@ class Confluence():
 
         cql_args = []
         if slug:
-            cql_args.append('label={}'.format(slug))
+            cql_args.append('label=\'{}\''.format(slug))
         if ancestor_id:
             cql_args.append('ancestor={}'.format(ancestor_id))
         if space:
