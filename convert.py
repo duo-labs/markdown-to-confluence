@@ -2,8 +2,10 @@ import mistune
 import os
 import textwrap
 import yaml
-
+import logging
 from urllib.parse import urlparse
+
+log = logging.getLogger(__name__)
 
 YAML_BOUNDARY = '---'
 
@@ -16,18 +18,26 @@ def parse(post_path):
     """
     raw_yaml = ''
     markdown = ''
-    in_yaml = True
+    in_yaml = False
     with open(post_path, 'r') as post:
+        line_count = 0
         for line in post.readlines():
+            line_count += 1
+            if line_count == 1 and line.strip() == YAML_BOUNDARY:
+                log.debug('Starting with Front matter')
+                in_yaml = True
+                continue
             # Check if this is the ending tag
             if line.strip() == YAML_BOUNDARY:
-                if in_yaml and raw_yaml:
+                log.debug('End of Front matter')
+                if in_yaml:
                     in_yaml = False
                     continue
             if in_yaml:
                 raw_yaml += line
             else:
                 markdown += line
+    log.debug('Front matter: {}'.format(raw_yaml))
     front_matter = yaml.load(raw_yaml, Loader=yaml.SafeLoader)
     markdown = markdown.strip()
     return front_matter, markdown
