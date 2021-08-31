@@ -3,10 +3,8 @@ import argparse
 from dataclasses import dataclass, field
 import logging
 import os
-from typing import List
+from typing import List, Optional, Tuple
 from record import Article, ArticleState
-import requests
-import git
 import sys
 import stat
 import mistune
@@ -162,38 +160,45 @@ class ArticleToSync:
     def authors(self) -> List[str]:
         return (self.front_matter or {}).get('authors', [])
 
+    @property
+    def self_placement(self) -> Tuple[Optional[str], Optional[str]]:
+        return self.wiki_config.get('space'), self.wiki_config.get('ancestor_id')
+
 class MarkdownToConfluence:
 
-    def __init__(self, confluence: Confluence, articles: List[Article], args: argparse.Namespace) -> None:
+    def __init__(self, confluence: Confluence, articles: List[Article], ancestor_id: str, space: str, global_labels: Optional[List[str]]) -> None:
         self.confluence = confluence
         self.articles = articles
-        self.args = args
-        # self.ancestor_id = ancestor_id
-        # self.space = space
+        self.ancestor_id = ancestor_id
+        self.space = space
+        self.global_labels = global_labels
 
+    def _get_placement(self, article: ArticleToSync) -> Tuple[str, str]:
+        space, ancestor_id = article.self_placement
+        if space is not None and ancestor_id is not None:
+            return space, ancestor_id
 
-    def get_ancestor_id(self, article: Article) -> str:
-
-        parent_relative_path = article.parent
+        parent_relative_path = article.article.parent
         if not parent_relative_path:
-            return self.args.ancestor_id
-        
+            return space or self.space, ancestor_id or self.ancestor_id
+
         parent = [ article for article in self.articles if article.relative_path == parent_relative_path ]
         if parent:
             parent = parent[0]
 
         if not parent:
             parent = Article(
-                absolute_path=os.path.dirname(article.absolute_path),
+                absolute_path=os.path.dirname(article.article.absolute_path),
                 relative_path=parent_relative_path,
                 is_directory=True,
             )
             self.articles.append(parent)
-            self._ensure_exists(parent)
         
+        self._sync_article(parent)
 
-        # ancestor_id = front_matter['wiki'].get('ancestor_id', self.args.ancestor_id)
-        return parent.confluence_id
+        # TODO check parent state
+
+        return space or parent.space, ancestor_id or parent.confluence_id
 
     def sync(self, ):
         for article in self.articles:
@@ -229,39 +234,41 @@ class MarkdownToConfluence:
 
         return page_html, renderer.attachments
 
-    def _ensure_exists(self, article: Article):
+    def _ensure_exists(self, article_to_sync: ArticleToSync):
+        space, ancestor_id = self._get_placement(article_to_sync)
 
-        space = self.args.space
-        ancestor_id = self.get_ancestor_id(article)
+        if space is None or ancestor_id is None:
+            raise Exception('Could not find placement for article: {} Space: {} Anchestor Id: {}'.format(article_to_sync.article, space, ancestor_id))
 
         page = self.confluence.exists(
-            id_label=article.id_label,
+            id_label=article_to_sync.article.id_label,
             ancestor_id=ancestor_id,
             space=space
         )
 
         if not page:
-            log.info('{} Page does not exist, creating...'.format(article))
+            log.info('{} Page does not exist, creating...'.format(article_to_sync.article))
             page = self.confluence.create(
-                id_label=article.id_label,
+                id_label=article_to_sync.article.id_label,
                 space=space,
-                title=article.name or 'Title missing',
+                title=article_to_sync.article.name or 'Title missing',
                 ancestor_id=ancestor_id,
             )
         else:
-            log.info('{} Page exists'.format(article))
+            log.info('{} Page exists'.format(article_to_sync))
             
         # TODO error handling. set SKIPPED
-        article.ancestor_id = ancestor_id
-        article.confluence_id = page['id']
-        article.page_version = page['version']['number']
-        article.state = ArticleState.CREATED
+        article_to_sync.article.ancestor_id = ancestor_id
+        article_to_sync.article.space = space
+        article_to_sync.article.confluence_id = page['id']
+        article_to_sync.article.page_version = page['version']['number']
+        article_to_sync.article.state = ArticleState.CREATED
 
         return page
 
     def _sync_article(self, article: Article):
 
-        if not article.is_directory and article.state in [ ArticleState.TO_BE_SYNCED, ArticleState.CREATED ]:
+        if article.content_path and article.state in [ ArticleState.TO_BE_SYNCED, ArticleState.CREATED ]:
             try:
                 articleToSync: ArticleToSync = self._parse(article)
             except Exception as e:
@@ -273,20 +280,20 @@ class MarkdownToConfluence:
 
             if not articleToSync.to_share:
                 log.info(
-                    'Post {} not set to be uploaded to Confluence'.format(article))
+                    'Article {} not set to be uploaded to Confluence'.format(article))
                 article.state = ArticleState.SKIPPED
                 return
 
             if article.state == ArticleState.TO_BE_SYNCED:
-                self._ensure_exists(article)
+                self._ensure_exists(articleToSync)
 
             if article.state == ArticleState.CREATED:
                 # Normalize the content into whatever format Confluence expects
-                html, attachments = self._convert_to_confluence(articleToSync)
+                html, attachments = self._convert_to_cconfluence(articleToSync)
 
                 tags = articleToSync.front_matter.get('tags', [])
-                if self.args.global_label:
-                    tags.append(self.args.global_label)
+                if self.global_labels:
+                    tags.append(self.global_labels)
 
                 log.info('Page exists, updating...')
                 self.confluence.update(
@@ -296,13 +303,20 @@ class MarkdownToConfluence:
                     title=articleToSync.front_matter['title'],
                     tags=tags,
                     id_label=article.id_label,
-                    space=self.args.space,
+                    space=article.space,
                     ancestor_id=article.ancestor_id,
                     page_version=article.page_version,
                     attachments=attachments,
                 )
 
                 article.state == ArticleState.SYNCED
+        elif not article.content_path and article.is_directory and article.state in [ ArticleState.TO_BE_SYNCED ]:
+            articleToSync = ArticleToSync(
+                article=article,
+                front_matter={},
+                markdown="",
+            )
+            self._ensure_exists(articleToSync)
 
 def is_hidden(filepath):
     name = os.path.basename(os.path.abspath(filepath))
@@ -330,14 +344,28 @@ def main():
                         files = [f for f in files if not f[0] == '.']
                         dirs[:] = [d for d in dirs if not d[0] == '.']
                         for f in files:
-                            articles.append(Article(
-                                absolute_path=os.path.join(root, f),
-                                relative_path=os.path.relpath(os.path.join(root, f), start=file_path)
-                            ))
+                            absolute_path = os.path.join(root, f)
+                            if f == 'README.md':
+                                dir_path = os.path.dirname(absolute_path)
+                                articles.append(Article(
+                                    absolute_path=dir_path,
+                                    relative_path=os.path.relpath(dir_path, start=file_path),
+                                    content_path=absolute_path,
+                                    is_directory=True,
+                                ))
+                            else:
+                                articles.append(Article(
+                                    absolute_path=absolute_path,
+                                    relative_path=os.path.relpath(absolute_path, start=file_path),
+                                    content_path=absolute_path,
+                                    is_directory=False
+                                ))
                 elif os.path.isfile(file_path):
+                    absolute_path=os.path.abspath(file_path)
                     articles.append(Article(
-                            absolute_path=os.path.abspath(file_path),
-                            relative_path=file_path
+                        absolute_path=absolute_path,
+                        relative_path=file_path,
+                        content_path=absolute_path,
                     ))
                 else:
                     log.info('Skipped: {}'.format(file_path))
@@ -358,7 +386,9 @@ def main():
     MarkdownToConfluence(
         confluence=confluence,
         articles=articles,
-        args=args
+        ancestor_id=args.ancestor_id,
+        space=args.space,
+        global_labels=[args.global_label]
     ).sync()
 
 

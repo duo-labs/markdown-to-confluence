@@ -262,12 +262,12 @@ class Confluence():
             log.error('Attachment {} does not exist'.format(attachment_path))
             return
         log.info(
-            'Uploading attachment {attachment_path} to post {post_id}'.format(
+            'Uploading attachment {attachment_path} to article {post_id}'.format(
                 attachment_path=attachment_path, post_id=post_id))
         self.post(path=path,
                   params={'allowDuplicated': 'true'},
                   files={'file': open(attachment_path, 'rb')})
-        log.info('Uploaded {} to post ID {}'.format(attachment_path, post_id))
+        log.info('Uploaded {} to article ID {}'.format(attachment_path, post_id))
 
     def get_author(self, username):
         """Returns the Confluence author profile for the provided username,
@@ -317,7 +317,7 @@ class Confluence():
         page_id = response['id']
         page_url = urljoin(self.api_url, response['_links']['webui'])
 
-        log.info('Page "{title}" (id {page_id}) created successfully at {url}'.
+        log.info('Article "{title}" (id {page_id}) created successfully at {url}'.
                  format(title=title, page_id=response.get('id'), url=page_url))
         
         self.create_labels(page_id, id_label)
@@ -368,5 +368,5 @@ class Confluence():
         # Finally, we can update the labels on the page
         self.create_labels(page_id=page_id, id_label=id_label, tags=tags)
 
-        log.info('Page "{title}" (id {page_id}) updated successfully at {url}'.
+        log.info('Article "{title}" (id {page_id}) updated successfully at {url}'.
                  format(title=title, page_id=page_id, url=page_url))
