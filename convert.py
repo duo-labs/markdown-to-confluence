@@ -13,11 +13,6 @@ YAML_BOUNDARY = '---'
 
 
 def parse(path: str) -> Tuple[dict, str]:
-    """Parses the metadata and content from the provided post.
-
-    Arguments:
-        article {Article} -- The absolute path to the Markdown post
-    """
     raw_yaml = ''
     markdown = ''
     in_yaml = False
@@ -43,18 +38,6 @@ def parse(path: str) -> Tuple[dict, str]:
     front_matter = yaml.load(raw_yaml, Loader=yaml.SafeLoader)
     markdown = markdown.strip()
     return front_matter or {}, markdown
-
-
-# def convert_to_confluence(markdown: str, article: Article, front_matter: dict={}):
-#     if front_matter is None:
-#         front_matter = {}
-
-#     author_keys = front_matter.get('author_keys', [])
-#     renderer = ConfluenceRenderer(authors=author_keys, article=article)
-#     content_html = mistune.markdown(markdown, renderer=renderer)
-#     page_html = renderer.layout(content_html)
-
-#     return page_html, renderer.attachments
 
 
 class ConfluenceRenderer(mistune.Renderer):
@@ -160,7 +143,7 @@ class ConfluenceRenderer(mistune.Renderer):
         image_tag = '<ri:url ri:value="{}" />'.format(src)
         if not is_external:
             # TODO I don't think image path should be like that.
-            image_path = os.path.normpath(os.path.join(os.path.dirname(self.article.absolute_director), src))
+            image_path = os.path.normpath(os.path.join(self.article.absolute_director, src))
             image_tag = '<ri:attachment ri:filename="{}" />'.format(
                 os.path.basename(image_path))
             log.debug('Found attachment: {}'.format(image_path))
