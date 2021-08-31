@@ -166,19 +166,19 @@ class ArticleToSync:
 
 class MarkdownToConfluence:
 
-    def __init__(self, confluence: Confluence, articles: List[Article], ancestor_id: str, space: str, global_labels: Optional[List[str]]) -> None:
+    def __init__(self, confluence: Confluence, articles: List[Article], ancestor_id: str, space: str, global_label: Optional[str]) -> None:
         self.confluence = confluence
         self.articles = articles
         self.ancestor_id = ancestor_id
         self.space = space
-        self.global_labels = global_labels
+        self.global_label = global_label
 
-    def _get_placement(self, article: ArticleToSync) -> Tuple[str, str]:
-        space, ancestor_id = article.self_placement
+    def _get_placement(self, article_to_sync: ArticleToSync) -> Tuple[str, str]:
+        space, ancestor_id = article_to_sync.self_placement
         if space is not None and ancestor_id is not None:
             return space, ancestor_id
 
-        parent_relative_path = article.article.parent
+        parent_relative_path = article_to_sync.article.parent
         if not parent_relative_path:
             return space or self.space, ancestor_id or self.ancestor_id
 
@@ -188,7 +188,7 @@ class MarkdownToConfluence:
 
         if not parent:
             parent = Article(
-                absolute_path=os.path.dirname(article.article.absolute_path),
+                absolute_path=os.path.dirname(article_to_sync.article.absolute_path),
                 relative_path=parent_relative_path,
                 is_directory=True,
             )
@@ -206,7 +206,7 @@ class MarkdownToConfluence:
             self._sync_article(article)
 
     def _parse(self, article: Article) -> ArticleToSync:
-        front_matter, markdown = parse(article.absolute_path)
+        front_matter, markdown = parse(article.content_path)
         articleToSync = ArticleToSync(
             article=article,
             front_matter=front_matter,
@@ -267,7 +267,7 @@ class MarkdownToConfluence:
         return page
 
     def _sync_article(self, article: Article):
-
+        log.info('Attempting to sync {}'.format(article))
         if article.content_path and article.state in [ ArticleState.TO_BE_SYNCED, ArticleState.CREATED ]:
             try:
                 articleToSync: ArticleToSync = self._parse(article)
@@ -289,11 +289,11 @@ class MarkdownToConfluence:
 
             if article.state == ArticleState.CREATED:
                 # Normalize the content into whatever format Confluence expects
-                html, attachments = self._convert_to_cconfluence(articleToSync)
+                html, attachments = self._convert_to_confluence(articleToSync)
 
                 tags = articleToSync.front_matter.get('tags', [])
-                if self.global_labels:
-                    tags.append(self.global_labels)
+                if self.global_label:
+                    tags.append(self.global_label)
 
                 log.info('Page exists, updating...')
                 self.confluence.update(
@@ -309,7 +309,7 @@ class MarkdownToConfluence:
                     attachments=attachments,
                 )
 
-                article.state == ArticleState.SYNCED
+                article.state = ArticleState.SYNCED
         elif not article.content_path and article.is_directory and article.state in [ ArticleState.TO_BE_SYNCED ]:
             articleToSync = ArticleToSync(
                 article=article,
@@ -317,6 +317,9 @@ class MarkdownToConfluence:
                 markdown="",
             )
             self._ensure_exists(articleToSync)
+            # article.state = ArticleState.SYNCED
+
+        log.info('Finished syncing {}. State: {}'.format(article, article.state))
 
 def is_hidden(filepath):
     name = os.path.basename(os.path.abspath(filepath))
@@ -372,7 +375,7 @@ def main():
             else:
                 log.info('File doesn\'t exist: {}'.format(file_path))
 
-        articles = [ file_to_upload for file_to_upload in articles if file_to_upload.is_markdown ]
+        articles = [ article for article in articles if article.is_markdown or article.is_directory ]
         log.debug('Articles to sync: {}'.format(articles))
     # else:
     #     repo = git.Repo(args.git)
@@ -388,7 +391,7 @@ def main():
         articles=articles,
         ancestor_id=args.ancestor_id,
         space=args.space,
-        global_labels=[args.global_label]
+        global_label=args.global_label,
     ).sync()
 
 
