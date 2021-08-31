@@ -3,7 +3,7 @@ import unittest
 import tempfile
 import textwrap
 
-from convert import convtoconf, ConfluenceRenderer, parse
+from convert import convert_to_confluence, ConfluenceRenderer, parse
 
 
 class TestConvert(unittest.TestCase):

@@ -1,14 +1,18 @@
 #!/usr/bin/env python3
 import argparse
+from dataclasses import dataclass, field
 import logging
 import os
+from typing import List
+from record import Article, ArticleState
 import requests
 import git
 import sys
 import stat
+import mistune
 
 from confluence import Confluence
-from convert import convtoconf, parse
+from convert import ConfluenceRenderer, parse
 """Deploys Markdown posts to Confluenceo
 
 This script is meant to be executed as either part of a CI/CD job or on an
@@ -52,22 +56,6 @@ def get_last_modified(repo):
             changed_files.remove(filepath)
     return changed_files
 
-
-def get_slug(filepath, prefix=''):
-    """Returns the slug for a given filepath
-    
-    Arguments:
-        filepath {str} -- The filepath for the post
-        prefix {str} -- Any prefixes to the slug
-    """
-    slug, _ = os.path.splitext(os.path.basename(filepath))
-    # Confluence doesn't support searching for labels with a "-",
-    # so we need to adjust it.
-    slug = slug.replace('-', '_')
-    slug = slug.replace(" ", "_")
-    if prefix:
-        slug = '{}_{}'.format(prefix, slug)
-    return slug
 
 
 def parse_args():
@@ -154,88 +142,174 @@ def parse_args():
     return parser.parse_args()
 
 
-def deploy_file(post_path, args, confluence):
-    """Creates or updates a file in Confluence
+@dataclass
+class ArticleToSync:
+
+    article: Article
+    front_matter: dict
+    markdown: str
+    author_keys: List[str] = field(default_factory=list)
+
+    @property
+    def wiki_config(self) -> dict:
+        return (self.front_matter or {}).get('wiki', {})
+
+    @property
+    def to_share(self) -> bool:
+        return self.wiki_config.get('share', False)
+
+    @property
+    def authors(self) -> List[str]:
+        return (self.front_matter or {}).get('authors', [])
+
+class MarkdownToConfluence:
+
+    def __init__(self, confluence: Confluence, articles: List[Article], args: argparse.Namespace) -> None:
+        self.confluence = confluence
+        self.articles = articles
+        self.args = args
+        # self.ancestor_id = ancestor_id
+        # self.space = space
+
+
+    def get_ancestor_id(self, article: Article) -> str:
+
+        parent_relative_path = article.parent
+        if not parent_relative_path:
+            return self.args.ancestor_id
+        
+        parent = [ article for article in self.articles if article.relative_path == parent_relative_path ]
+        if parent:
+            parent = parent[0]
+
+        if not parent:
+            parent = Article(
+                absolute_path=os.path.dirname(article.absolute_path),
+                relative_path=parent_relative_path,
+                is_directory=True,
+            )
+            self.articles.append(parent)
+            self._ensure_exists(parent)
+        
+
+        # ancestor_id = front_matter['wiki'].get('ancestor_id', self.args.ancestor_id)
+        return parent.confluence_id
+
+    def sync(self, ):
+        for article in self.articles:
+            log.info('Attempting to sync {}'.format(article))
+            self._sync_article(article)
+
+    def _parse(self, article: Article) -> ArticleToSync:
+        front_matter, markdown = parse(article.absolute_path)
+        articleToSync = ArticleToSync(
+            article=article,
+            front_matter=front_matter,
+            markdown=markdown
+        )
+        self._set_author_keys(articleToSync)
+        return articleToSync
+
+
+    def _set_author_keys(self, articleToSync: ArticleToSync):
+        author_keys = []
+        authors = articleToSync.front_matter.get('authors', [])
+        for author in authors:
+            confluence_author = self.confluence.get_author(author)
+            if not confluence_author:
+                continue
+            author_keys.append(confluence_author['userKey'])
+        articleToSync.author_keys = author_keys
+
     
-    Arguments:
-        post_path {str} -- The absolute path of the post to deploy to Confluence
-        args {argparse.Arguments} -- The parsed command-line arguments
-        confluence {confluence.Confluence} -- The Confluence API client
-    """
+    def _convert_to_confluence(self, articleToSync: ArticleToSync):
+        renderer = ConfluenceRenderer(authors=articleToSync.author_keys, article=articleToSync.article)
+        content_html = mistune.markdown(articleToSync.markdown, renderer=renderer)
+        page_html = renderer.layout(content_html)
 
-    _, ext = os.path.splitext(post_path)
-    if ext not in SUPPORTED_FORMATS:
-        log.info('Skipping {} since it\'s not a supported format.'.format(
-            post_path))
-        return
+        return page_html, renderer.attachments
 
-    try:
-        front_matter, markdown = parse(post_path)
-    except Exception as e:
-        log.error(
-            'Unable to process {}. Normally not a problem, but here\'s the error we received: {}'
-            .format(post_path, e))
-        return
+    def _ensure_exists(self, article: Article):
 
-    if not front_matter or not front_matter.get('wiki', {}).get('share'):
-        log.info(
-            'Post {} not set to be uploaded to Confluence'.format(post_path))
-        return
+        space = self.args.space
+        ancestor_id = self.get_ancestor_id(article)
 
-    front_matter['author_keys'] = []
-    authors = front_matter.get('authors', [])
-    for author in authors:
-        confluence_author = confluence.get_author(author)
-        if not confluence_author:
-            continue
-        front_matter['author_keys'].append(confluence_author['userKey'])
+        page = self.confluence.exists(
+            id_label=article.id_label,
+            ancestor_id=ancestor_id,
+            space=space
+        )
 
-    # Normalize the content into whatever format Confluence expects
-    html, attachments = convtoconf(markdown, front_matter=front_matter, post_path=post_path)
+        if not page:
+            log.info('{} Page does not exist, creating...'.format(article))
+            page = self.confluence.create(
+                id_label=article.id_label,
+                space=space,
+                title=article.name or 'Title missing',
+                ancestor_id=ancestor_id,
+            )
+        else:
+            log.info('{} Page exists'.format(article))
+            
+        # TODO error handling. set SKIPPED
+        article.ancestor_id = ancestor_id
+        article.confluence_id = page['id']
+        article.page_version = page['version']['number']
+        article.state = ArticleState.CREATED
 
-    slug_prefix = '_'.join(author.lower() for author in authors)
-    post_slug = get_slug(post_path, prefix=slug_prefix)
+        return page
 
-    ancestor_id = front_matter['wiki'].get('ancestor_id', args.ancestor_id)
-    space = front_matter['wiki'].get('space', args.space)
+    def _sync_article(self, article: Article):
 
-    tags = front_matter.get('tags', [])
-    if args.global_label:
-        tags.append(args.global_label)
+        if not article.is_directory and article.state in [ ArticleState.TO_BE_SYNCED, ArticleState.CREATED ]:
+            try:
+                articleToSync: ArticleToSync = self._parse(article)
+            except Exception as e:
+                log.exception(
+                    'Unable to process {}. Normally not a problem, but here\'s the error we received: {}'
+                    .format(article, e))
+                article.state = ArticleState.SKIPPED
+                return
 
-    page = confluence.exists(slug=post_slug,
-                             ancestor_id=ancestor_id,
-                             space=space)
-    if page:
-        log.info('Page exists, updating...')
-        confluence.update(page['id'],
-                          content=html,
-                          title=front_matter['title'],
-                          tags=tags,
-                          slug=post_slug,
-                          space=space,
-                          ancestor_id=ancestor_id,
-                          page=page,
-                          attachments=attachments)
-    else:
-        log.info('Page does not exist, creating...')
-        confluence.create(content=html,
-                          title=front_matter['title'],
-                          tags=tags,
-                          slug=post_slug,
-                          space=space,
-                          ancestor_id=ancestor_id,
-                          attachments=attachments)
+            if not articleToSync.to_share:
+                log.info(
+                    'Post {} not set to be uploaded to Confluence'.format(article))
+                article.state = ArticleState.SKIPPED
+                return
+
+            if article.state == ArticleState.TO_BE_SYNCED:
+                self._ensure_exists(article)
+
+            if article.state == ArticleState.CREATED:
+                # Normalize the content into whatever format Confluence expects
+                html, attachments = self._convert_to_confluence(articleToSync)
+
+                tags = articleToSync.front_matter.get('tags', [])
+                if self.args.global_label:
+                    tags.append(self.args.global_label)
+
+                log.info('Page exists, updating...')
+                self.confluence.update(
+                    article.confluence_id,
+                    content=html,
+                    # TODO fixme
+                    title=articleToSync.front_matter['title'],
+                    tags=tags,
+                    id_label=article.id_label,
+                    space=self.args.space,
+                    ancestor_id=article.ancestor_id,
+                    page_version=article.page_version,
+                    attachments=attachments,
+                )
+
+                article.state == ArticleState.SYNCED
+
 def is_hidden(filepath):
     name = os.path.basename(os.path.abspath(filepath))
     return name.startswith('.') or has_hidden_attribute(filepath)
 
 def has_hidden_attribute(filepath):
     return bool(os.stat(filepath).st_file_attributes & stat.FILE_ATTRIBUTE_HIDDEN)
-
-def is_markdown(filepath):
-    name = os.path.basename(os.path.abspath(filepath))
-    return name.endswith('.md')
 
 def main():
     args = parse_args()
@@ -245,10 +319,10 @@ def main():
                             password=args.password,
                             headers=args.headers,
                             dry_run=args.dry_run)
-
+                            
+    articles: List[Article] = []
     if args.files:
         files = [os.path.abspath(post) for post in args.files]
-        files_to_upload = []
         for file_path in files:
             if os.path.exists(file_path):
                 if os.path.isdir(file_path):
@@ -256,28 +330,37 @@ def main():
                         files = [f for f in files if not f[0] == '.']
                         dirs[:] = [d for d in dirs if not d[0] == '.']
                         for f in files:
-                            files_to_upload.append(os.path.join(root,f))
+                            articles.append(Article(
+                                absolute_path=os.path.join(root, f),
+                                relative_path=os.path.relpath(os.path.join(root, f), start=file_path)
+                            ))
                 elif os.path.isfile(file_path):
-                    files_to_upload.append(file_path)
+                    articles.append(Article(
+                            absolute_path=os.path.abspath(file_path),
+                            relative_path=file_path
+                    ))
                 else:
                     log.info('Skipped: {}'.format(file_path))
             else:
                 log.info('File doesn\'t exist: {}'.format(file_path))
 
-        files_to_upload = [ file_to_upload for file_to_upload in files_to_upload if is_markdown(file_to_upload) ]
-        log.debug('Files to sync: {}'.format(files_to_upload))
-    else:
-        repo = git.Repo(args.git)
-        files_to_upload = [
-            os.path.join(args.git, file_to_upload) for file_to_upload in get_last_modified(repo)
-        ]
-    if not files_to_upload:
+        articles = [ file_to_upload for file_to_upload in articles if file_to_upload.is_markdown ]
+        log.debug('Articles to sync: {}'.format(articles))
+    # else:
+    #     repo = git.Repo(args.git)
+    #     files_to_upload = [
+    #         os.path.join(args.git, file_to_upload) for file_to_upload in get_last_modified(repo)
+    #     ]
+    if not articles:
         log.info('No files created/modified in the latest commit')
         return
 
-    for post in files_to_upload:
-        log.info('Attempting to deploy {}'.format(post))
-        deploy_file(post, args, confluence)
+    MarkdownToConfluence(
+        confluence=confluence,
+        articles=articles,
+        args=args
+    ).sync()
+
 
 
 if __name__ == '__main__':

@@ -73,7 +73,7 @@ class TestConfluence(unittest.TestCase):
                                       status=200,
                                       is_json=True)
         self.api._session = client
-        got = self.api.exists(slug=self.slug)
+        got = self.api.exists(id_label=self.slug)
         self.assertTrue(got)
 
     def testPostDoesntExist(self):
@@ -87,7 +87,7 @@ class TestConfluence(unittest.TestCase):
                                       status=200,
                                       is_json=True)
         self.api._session = client
-        got = self.api.exists(slug=self.slug)
+        got = self.api.exists(id_label=self.slug)
         self.assertFalse(got)
 
     def testLabelCreation(self):

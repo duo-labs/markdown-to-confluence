@@ -1,3 +1,5 @@
+from typing import Any, Tuple
+from record import Article
 import mistune
 import os
 import textwrap
@@ -10,16 +12,16 @@ log = logging.getLogger(__name__)
 YAML_BOUNDARY = '---'
 
 
-def parse(post_path):
+def parse(path: str) -> Tuple[dict, str]:
     """Parses the metadata and content from the provided post.
 
     Arguments:
-        post_path {str} -- The absolute path to the Markdown post
+        article {Article} -- The absolute path to the Markdown post
     """
     raw_yaml = ''
     markdown = ''
     in_yaml = False
-    with open(post_path, 'r') as post:
+    with open(path, 'r') as post:
         line_count = 0
         for line in post.readlines():
             line_count += 1
@@ -40,29 +42,29 @@ def parse(post_path):
     log.debug('Front matter: {}'.format(raw_yaml))
     front_matter = yaml.load(raw_yaml, Loader=yaml.SafeLoader)
     markdown = markdown.strip()
-    return front_matter, markdown
+    return front_matter or {}, markdown
 
 
-def convtoconf(markdown, front_matter={}, post_path='.'):
-    if front_matter is None:
-        front_matter = {}
+# def convert_to_confluence(markdown: str, article: Article, front_matter: dict={}):
+#     if front_matter is None:
+#         front_matter = {}
 
-    author_keys = front_matter.get('author_keys', [])
-    renderer = ConfluenceRenderer(authors=author_keys, post_path=post_path)
-    content_html = mistune.markdown(markdown, renderer=renderer)
-    page_html = renderer.layout(content_html)
+#     author_keys = front_matter.get('author_keys', [])
+#     renderer = ConfluenceRenderer(authors=author_keys, article=article)
+#     content_html = mistune.markdown(markdown, renderer=renderer)
+#     page_html = renderer.layout(content_html)
 
-    return page_html, renderer.attachments
+#     return page_html, renderer.attachments
 
 
 class ConfluenceRenderer(mistune.Renderer):
-    def __init__(self, authors=[], post_path='.'):
+    def __init__(self, article: Article, authors=[]):
         self.attachments = []
         if authors is None:
             authors = []
         self.authors = authors
         self.has_toc = False
-        self.post_path = post_path
+        self.article = article
         super().__init__()
 
     def layout(self, content):
@@ -157,7 +159,8 @@ class ConfluenceRenderer(mistune.Renderer):
         tag_template = '<ac:image>{image_tag}</ac:image>'
         image_tag = '<ri:url ri:value="{}" />'.format(src)
         if not is_external:
-            image_path = os.path.normpath(os.path.join(os.path.dirname(self.post_path), src))
+            # TODO I don't think image path should be like that.
+            image_path = os.path.normpath(os.path.join(os.path.dirname(self.article.absolute_director), src))
             image_tag = '<ri:attachment ri:filename="{}" />'.format(
                 os.path.basename(image_path))
             log.debug('Found attachment: {}'.format(image_path))
