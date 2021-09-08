@@ -383,7 +383,7 @@ def main():
     #         os.path.join(args.git, file_to_upload) for file_to_upload in get_last_modified(repo)
     #     ]
     if not articles:
-        log.info('No files created/modified in the latest commit')
+        log.info('Could not find any article to upload or update')
         return
 
     MarkdownToConfluence(

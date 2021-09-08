@@ -9,4 +9,4 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD [ "python", "./markdown-to-confluence.py" ]
+ENTRYPOINT [ "python", "./markdown-to-confluence.py" ]

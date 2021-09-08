@@ -38,8 +38,6 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --git GIT             The path to your Git repository (default:
-                        /home/barnabas/Repositories/markdown-to-confluence))
   --api_url API_URL     The URL to the Confluence API (e.g.
                         https://wiki.example.com/rest/api/)
   --username USERNAME   The username for authentication to Confluence
@@ -76,14 +74,10 @@ wiki:
 
 There are two ways to deploy a post:
 
-### Syncing from a Git Repository
+## Using with Docker
 
-This project was originally created to keep an instance of Journal in sync with a Confluence instance. To that end, this project is able to be run as part of a CI/CD pipeline, taking the Markdown files modified in the latest commit and syncing them to the upstream Confluence instance.
-
-To enable this as part of your CI/CD pipeline, run `markdown-to-confluence`, providing the `--git` flag:
-
-```
-markdown-to-confluence.py --git /path/to/your/repo
+```bash
+docker run --read-only -v <directory containing the markdowns>:/data barnabassudy/markdown-to-confluence:v0.1 --api_url <confluence base url> --username <confluence username> --password <confluence api token> --space <confluence space> --ancestor_id <parent page> /data
 ```
 
 ### Deploying Posts On-Demand
