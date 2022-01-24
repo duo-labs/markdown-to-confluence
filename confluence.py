@@ -105,13 +105,15 @@ class Confluence():
                                      files=files))
             if method != 'GET':
                 return {}
-
-        response = self._session.request(method=method,
-                                         url=url,
-                                         params=params,
-                                         json=data,
-                                         headers=headers,
-                                         files=files)
+        try:
+            response = self._session.request(method=method,
+                                            url=url,
+                                            params=params,
+                                            json=data,
+                                            headers=headers,
+                                            files=files)
+        except Exception as err:
+            print(err)
 
         if not response.ok:
             log.info('''{method} {url}: {status_code} {reason}
@@ -318,7 +320,10 @@ class Confluence():
                                          ancestor_id=ancestor_id,
                                          space=space,
                                          type=type)
-        response = self.post(path='content/', data=page)
+        try:
+            response = self.post(path='content/', data=page)
+        except Exception as err:
+            print(err)
 
         page_id = response['id']
         page_url = urljoin(self.api_url, response['_links']['webui'])
