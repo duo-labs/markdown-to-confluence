@@ -3,11 +3,11 @@
     "configurations": [
         {
             "env": {"CONFLUENCE_USERNAME" : "mark@developersinstitute.ac.nz"},
-            "args": ["--api_url", "https://developersinstitute.atlassian.net/wiki/rest/api", "--password", "GET CONFLUENCE_API_KEY from 1password", "--space", "TESTSPACE", "--ancestor_id", "685015175", "--git", "/home/mark/dev/DI/SAAS/handbook/" ],
+            "args": ["--api_url", "https://developersinstitute.atlassian.net/wiki/rest/api", "--password", "${env:CONFLUENCE_API_KEY}", "--space", "TESTSPACE", "--ancestor_id", "685015175", "--git", "/home/mark/dev/DI/SAAS/handbook/" ],
             "name": "Python: Current File",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program":"${workspaceFolder}/markdown-to-confluence.py",
             "console": "integratedTerminal"
         }
     ]

@@ -18,6 +18,12 @@ Alternatively, you can use the provided Dockerfile:
 docker build -t markdown-to-confluence .
 ```
 
+# To Debug from VSCode
+- obtain the CONFLUENCE_API_KEY from 1password
+- export the key to a local environment variable: `export CONFLUENCE_API_KEY your-value-from-1password`
+- clone your wiki locally, and add the path in `launch.json`
+- hit play or f5 to run and debug.
+
 # Usage
 
 ```
