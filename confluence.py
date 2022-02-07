@@ -320,23 +320,27 @@ class Confluence():
                                          type=type)
         response = self.post(path='content/', data=page)
 
-        page_id = response['id']
-        page_url = urljoin(self.api_url, response['_links']['webui'])
+        if not self.dry_run:
+            page_id = response['id']
+            page_url = urljoin(self.api_url, response['_links']['webui'])
 
-        log.info('Page "{title}" (id {page_id}) created successfully at {url}'.
-                 format(title=title, page_id=response.get('id'), url=page_url))
+            log.info('Page "{title}" (id {page_id}) created successfully at {url}'.
+                    format(title=title, page_id=response.get('id'), url=page_url))
 
-        # Now that we have the page created, we can just treat the rest of the
-        # flow like an update.
-        return self.update(post_id=page_id,
-                           content=content,
-                           space=space,
-                           title=title,
-                           ancestor_id=ancestor_id,
-                           slug=slug,
-                           tags=tags,
-                           page=response,
-                           attachments=attachments)
+            # Now that we have the page created, we can just treat the rest of the
+            # flow like an update.
+            return self.update(post_id=page_id,
+                            content=content,
+                            space=space,
+                            title=title,
+                            ancestor_id=ancestor_id,
+                            slug=slug,
+                            tags=tags,
+                            page=response,
+                            attachments=attachments)
+        else:
+            log.info('Dry Run - No changes made')
+
 
     def update(self,
                post_id=None,
