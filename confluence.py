@@ -113,7 +113,8 @@ class Confluence():
                                             headers=headers,
                                             files=files)
         except Exception as err:
-            print(err)
+            pass
+            # print(err)
 
         if not response.ok:
             log.info('''{method} {url}: {status_code} {reason}
@@ -126,7 +127,6 @@ class Confluence():
                                      params=params,
                                      data=data,
                                      files=files))
-            print(response.content)
             return response.content
 
         # Will probably want to be more robust here, but this should work for now
@@ -209,7 +209,7 @@ class Confluence():
         if not any(label['name'] == slug for label in labels):
             log.error(
                 'Returned labels missing the expected slug: {}'.format(slug))
-            log.error('Here are the labels we got: {}'.format(labels))
+            log.warning('Here are the labels we got: {}'.format(labels))
             return labels
 
         log.info(
@@ -259,7 +259,7 @@ class Confluence():
             attachment_path {str} -- The absolute path to the attachment
         """
         path = 'content/{}/child/attachment'.format(post_id)
-        if not os.path.exists(attachment_path):
+        if not os.path.exists(os.path.join('../handbook-md.wiki/',  attachment_path)):
             log.error('Attachment {} does not exist'.format(attachment_path))
             return
         log.info(
@@ -323,7 +323,8 @@ class Confluence():
         try:
             response = self.post(path='content/', data=page)
         except Exception as err:
-            print(err)
+            pass
+            #print(err)
 
         page_id = response['id']
         page_url = urljoin(self.api_url, response['_links']['webui'])
@@ -401,7 +402,7 @@ class Confluence():
         # we can upload the final content up to Confluence.
         path = 'content/{}'.format(page['id'])
         response = self.put(path=path, data=new_page)
-        print(response)
+        # print(response)
 
         page_url = urljoin(self.api_url, response['_links']['webui'])
 

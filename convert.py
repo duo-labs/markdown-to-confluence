@@ -2,8 +2,12 @@ import mistune
 import os
 import textwrap
 import yaml
+import re
 
 from urllib.parse import urlparse
+
+def get_title(filepath):
+    return filepath.split('.')[-2].split('/')[-1]
 
 YAML_BOUNDARY = '---'
 
@@ -20,22 +24,55 @@ def parse(post_path):
     with open(post_path, 'r') as post:
         for line in post.readlines():
             # Check if this is the ending tag
-            if line.strip() == YAML_BOUNDARY:
-                if in_yaml and raw_yaml:
-                    in_yaml = False
-                    continue
-            if in_yaml:
-                raw_yaml += line
-            else:
-                markdown += line
-    front_matter = yaml.load(raw_yaml, Loader=yaml.SafeLoader)
+            # if line.strip() == YAML_BOUNDARY:
+            #     if in_yaml and raw_yaml:
+            #         in_yaml = False
+            #         # continue
+            # if in_yaml:
+            #     raw_yaml += line
+            # else:
+            markdown += line
+    # front_matter = yaml.load(raw_yaml, Loader=yaml.SafeLoader)
+    title = get_title(post_path)
+    front_matter = {
+            'title':title,
+            'wiki': {
+                'share': 'true'
+            }
+        }
+    if 'Exporting Spotlight Export to Forecast' in markdown:
+        print('this is the ops handbook')
     markdown = markdown.strip()
-    return front_matter, markdown
+    sanitised_markdown = sanitise_links(markdown)
 
+    return front_matter, sanitised_markdown
+
+def sanitise_links(markdown):
+    # remove any github DI url prefix
+    # https://github.com/Developers-Institute-Internal/handbook-md/wiki/Company-Culture#company-vision
+    
+    prefixes_to_remove = [
+        'https://github.com/Developers-Institute-Internal/handbook-md/wiki/',
+        'https://github.com/Developers-Institute-Internal/',
+        'https://github.com/Developers-Institute-Internal/handbook-md/blob/master/',
+        './handbook-md/blob/master/',
+        './handbook-md/'
+    ]
+
+
+
+    for prefix_to_remove in prefixes_to_remove:
+        markdown = re.sub(prefix_to_remove,'./', markdown)
+    return markdown
 
 def convtoconf(markdown, front_matter={}):
     if front_matter is None:
-        front_matter = {}
+        front_matter = {
+            'title': 'unknown title',
+            'wiki': {
+                'share': 'true'
+            }
+        }
 
     author_keys = front_matter.get('author_keys', [])
     renderer = ConfluenceRenderer(authors=author_keys)
@@ -143,6 +180,9 @@ class ConfluenceRenderer(mistune.Renderer):
         # Check if the image is externally hosted, or hosted as a static
         # file within Journal
         is_external = bool(urlparse(src).netloc)
+        if 'static' in src :
+            print('it has static')
+
         tag_template = '<ac:image>{image_tag}</ac:image>'
         image_tag = '<ri:url ri:value="{}" />'.format(src)
         if not is_external:

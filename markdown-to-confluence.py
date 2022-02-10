@@ -14,7 +14,7 @@ This script is meant to be executed as either part of a CI/CD job or on an
 adhoc basis.
 """
 
-logging.basicConfig(format='%(asctime)s %(message)s', level=logging.INFO)
+logging.basicConfig(format='%(asctime)s %(message)s', level=logging.ERROR)
 log = logging.getLogger(__name__)
 
 SUPPORTED_FORMATS = ['.md']
@@ -41,7 +41,7 @@ def get_environ_headers(prefix):
 
 def get_last_modified(repo):
     """Returns the paths to the last modified files in the provided Git repo
-    
+
     Arguments:
         repo {git.Repo} -- The repository object
     """
@@ -54,7 +54,7 @@ def get_last_modified(repo):
 
 def get_slug(filepath, prefix=''):
     """Returns the slug for a given filepath
-    
+
     Arguments:
         filepath {str} -- The filepath for the post
         prefix {str} -- Any prefixes to the slug
@@ -81,43 +81,37 @@ def parse_args():
         '--api_url',
         dest='api_url',
         default=os.getenv('CONFLUENCE_API_URL'),
-        help=
-        'The URL to the Confluence API (e.g. https://wiki.example.com/rest/api/)'
+        help='The URL to the Confluence API (e.g. https://wiki.example.com/rest/api/)'
     )
     parser.add_argument(
         '--username',
         dest='username',
         default=os.getenv('CONFLUENCE_USERNAME'),
-        help=
-        'The username for authentication to Confluence (default: env(\'CONFLUENCE_USERNAME\'))'
+        help='The username for authentication to Confluence (default: env(\'CONFLUENCE_USERNAME\'))'
     )
     parser.add_argument(
         '--password',
         dest='password',
         default=os.getenv('CONFLUENCE_PASSWORD'),
-        help=
-        'The password for authentication to Confluence (default: env(\'CONFLUENCE_PASSWORD\'))'
+        help='The password for authentication to Confluence (default: env(\'CONFLUENCE_PASSWORD\'))'
     )
     parser.add_argument(
         '--space',
         dest='space',
         default=os.getenv('CONFLUENCE_SPACE'),
-        help=
-        'The Confluence space where the post should reside (default: env(\'CONFLUENCE_SPACE\'))'
+        help='The Confluence space where the post should reside (default: env(\'CONFLUENCE_SPACE\'))'
     )
     parser.add_argument(
         '--ancestor_id',
         dest='ancestor_id',
         default=os.getenv('CONFLUENCE_ANCESTOR_ID'),
-        help=
-        'The Confluence ID of the parent page to place posts under (default: env(\'CONFLUENCE_ANCESTOR_ID\'))'
+        help='The Confluence ID of the parent page to place posts under (default: env(\'CONFLUENCE_ANCESTOR_ID\'))'
     )
     parser.add_argument(
         '--global_label',
         dest='global_label',
         default=os.getenv('CONFLUENCE_GLOBAL_LABEL'),
-        help=
-        'The label to apply to every post for easier discovery in Confluence (default: env(\'CONFLUENCE_GLOBAL_LABEL\'))'
+        help='The label to apply to every post for easier discovery in Confluence (default: env(\'CONFLUENCE_GLOBAL_LABEL\'))'
     )
     parser.add_argument(
         '--header',
@@ -125,22 +119,24 @@ def parse_args():
         dest='headers',
         action='append',
         default=get_environ_headers('CONFLUENCE_HEADER_'),
-        help=
-        'Extra header to include in the request when sending HTTP to a server. May be specified multiple times. (default: env(\'CONFLUENCE_HEADER_<NAME>\'))'
+        help='Extra header to include in the request when sending HTTP to a server. May be specified multiple times. (default: env(\'CONFLUENCE_HEADER_<NAME>\'))'
     )
     parser.add_argument(
         '--dry-run',
         dest='dry_run',
         action='store_true',
-        help=
-        'Print requests that would be sent- don\'t actually make requests against Confluence (note: we return empty responses, so this might impact accuracy)'
+        help='Print requests that would be sent- don\'t actually make requests against Confluence (note: we return empty responses, so this might impact accuracy)'
     )
     parser.add_argument(
         'posts',
         type=str,
         nargs='*',
-        help=
-        'Individual files to deploy to Confluence (takes precendence over --git)'
+        help='Individual files to deploy to Confluence (takes precendence over --git)'
+    )
+    parser.add_argument(
+        '--folder',
+        type=str,
+        help='Folder of files to deploy to Confluence (takes precendence over --git)'
     )
 
     args = parser.parse_args()
@@ -154,7 +150,7 @@ def parse_args():
 
 def deploy_file(post_path, args, confluence):
     """Creates or updates a file in Confluence
-    
+
     Arguments:
         post_path {str} -- The absolute path of the post to deploy to Confluence
         args {argparse.Arguments} -- The parsed command-line arguments
@@ -191,9 +187,9 @@ def deploy_file(post_path, args, confluence):
     # Normalize the content into whatever format Confluence expects
     html, attachments = convtoconf(markdown, front_matter=front_matter)
 
-    static_path = os.path.join(args.git, 'static')
-    for i, attachment in enumerate(attachments):
-        attachments[i] = os.path.join(static_path, attachment.lstrip('/'))
+    # static_path = os.path.join(args.git, 'static')
+    # for i, attachment in enumerate(attachments):
+    #     attachments[i] = os.path.join(static_path, attachment.lstrip('/'))
 
     slug_prefix = '_'.join(author.lower() for author in authors)
     post_slug = get_slug(post_path, prefix=slug_prefix)
@@ -228,6 +224,9 @@ def deploy_file(post_path, args, confluence):
                           attachments=attachments)
 
 
+# def check_file_exists(filepaths):
+
+
 def main():
     args = parse_args()
 
@@ -243,7 +242,15 @@ def main():
             if not os.path.exists(post_path) or not os.path.isfile(post_path):
                 log.error('File doesn\'t exist: {}'.format(post_path))
                 sys.exit(1)
-    else:
+    elif args.folder:
+        changed_posts = []
+        folder = os.path.abspath(args.folder)
+        for root, directories, filenames in os.walk(folder): 
+            for filename in filenames:  
+                if filename.endswith('.md'):
+                    changed_posts.append(os.path.abspath(os.path.join(root,filename))) 
+
+    elif args.git:
         repo = git.Repo(args.git)
         changed_posts = [
             os.path.join(args.git, post) for post in get_last_modified(repo)
@@ -251,10 +258,17 @@ def main():
     if not changed_posts:
         log.info('No post created/modified in the latest commit')
         return
-
+    failed_posts=[]
     for post in changed_posts:
         log.info('Attempting to deploy {}'.format(post))
-        deploy_file(post, args, confluence)
+        try:
+          deploy_file(post, args, confluence)
+        except Exception as e:
+          print("error deploying {}:\n{}".format(post, e))
+          failed_posts.append(post)
+    print(str(len(failed_posts)) + ' failed posts')
+    for post in failed_posts:
+        print(post)
 
 
 if __name__ == '__main__':
