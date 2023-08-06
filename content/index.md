@@ -46,4 +46,4 @@ Follow the links below for project specific documentation.
 
 ### Multi-type Collection
 
-The documentation related to the multitype-collection prototype is available over [here.](multitype-collection/index.md)
+The documentation related to the multitype-collection prototype is available over [here](multitype-collection/index.md).
