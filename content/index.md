@@ -31,3 +31,19 @@ Some of the key benefits of adopting this approach would be:
 For every new piece of documentation we shall follow the Gitflow model, as done for the development process, i.e. taking a new _feature_ branch out of `master`.
 
 Once the documentation has been completed a merge request shall be submitted to initiate the _documentation review_ process. After the review process has been completed and all feedback has been incorporated, the merge request shall be approved and the documentation shall be added to the `master` branch.
+
+## Projects
+
+Follow the links below for project specific documentation.
+
+### Leetcode Diaries
+
+> _To be added_
+
+### Attendance Automation
+
+> _To be added_
+
+### Multi-type Collection
+
+The documentation related to the multitype-collection prototype is available over [here.](multitype-collection/index.md)
