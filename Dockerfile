@@ -4,8 +4,8 @@ WORKDIR /usr/src/app
 
 RUN apk add --no-cache git
 
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.txt constraint.txt ./
+RUN PIP_CONSTRAINT=constraint.txt pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
